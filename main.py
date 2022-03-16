@@ -1,17 +1,13 @@
-from hashlib import new
-from multiprocessing.spawn import old_main_modules
-import os
 import time
 import psutil
 import pickle
-import wmi
 
 
 def get_process_exes():
     names = []
     for process in psutil.process_iter():
         try:
-            time.sleep(.0001)
+            time.sleep(.1)
             names.append(process.exe())
         except:
             continue
@@ -46,12 +42,6 @@ class Processes():
         self.processes = []
         for process in psutil.process_iter():
             self.processes.append(Process(process))
-
-    def is_process_running(self, process_name: str):
-        for process_name_i in get_process_exes():
-            if process_name == process_name_i:
-                return True
-        return False
 
     def save_status(self):
         with open("pickled.dat", "wb+") as file:
@@ -113,10 +103,9 @@ def main():
         previous_name = ""
         for process in processes.processes:
             time.sleep(.01)
-            if (process.path in settings.settings
-                    and process.path in current_processes
+            if ((process.path in settings.settings or process.name in settings.settings) and
+                    process.path in current_processes
                     and previous_name != process.name):
-                time.sleep(.01)
                 processes.save_status()
                 process.runtime += time.time() - start
                 previous_name = process.name
