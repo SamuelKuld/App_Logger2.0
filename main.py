@@ -6,8 +6,8 @@ import pickle
 def get_process_exes():
     names = []
     for process in psutil.process_iter():
+        time.sleep(.1)
         try:
-            time.sleep(.1)
             names.append(process.exe())
         except:
             continue
@@ -50,9 +50,11 @@ class Processes():
             previous_path = ""
             for process in self.processes:
                 for setting in self.settings:
-                    if process.path == setting and previous_path != process.path:
+                    if (process.path == setting or setting == "All") and previous_path != process.path:
                         file.write(f"{process.name} = {process.runtime}\n")
                         previous_path = process.path
+
+        self.update_process_list()
 
     def load_status(self):
         try:
@@ -99,16 +101,19 @@ def main():
     processes.load_status()
     while 1:
         start = time.time()
+        processes_to_change = []
         current_processes = get_process_exes()
         previous_name = ""
-        for process in processes.processes:
+        for i, process in enumerate(processes.processes):
             time.sleep(.01)
-            if ((process.path in settings.settings or process.name in settings.settings) and
+            if (
                     process.path in current_processes
                     and previous_name != process.name):
-                processes.save_status()
-                process.runtime += time.time() - start
+                processes_to_change.append(i)
                 previous_name = process.name
+        for i in processes_to_change:
+            processes.processes[i].runtime += time.time() - start
+        processes.save_status()
 
 
 if __name__ == '__main__':
