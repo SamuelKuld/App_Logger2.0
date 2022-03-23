@@ -95,7 +95,7 @@ class Settings():
         self.settings = file_data.split("\n")
 
 
-def main():
+def main_loop():
     settings = Settings()
     processes = Processes(settings.settings)
     processes.load_status()
@@ -117,4 +117,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main_loop()
