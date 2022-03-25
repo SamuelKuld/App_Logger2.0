@@ -1,119 +1,81 @@
 import time
+from typing import Type
 import psutil
 import pickle
 
 
-def get_process_exes():
-    names = []
-    for process in psutil.process_iter():
-        time.sleep(.1)
-        try:
-            names.append(process.exe())
-        except:
-            continue
-    return names
-
-
-class Process():
-    def __init__(self, process):
-        try:
-            self.name = process.name()
-            self.process_id = process.pid
-            self.path = process.exe()
-            self.runtime = 0
-        except:
-            self.name = None
-            self.process_id = None
-            self.path = None
-            self.runtime = 0
-
-    def set_pid(self, pid):
-        self.process_id = pid
-
-    def __repr__(self):
-        return f"{'{'}\n  Name : {self.name}\n  Path : {self.path}\nruntime : {self.runtime}\n{'}'}\n\n"
+class Process:
+    def __init__(self, process, time_running=0):
+        self.time_running = time_running
+        self.process = process
+        self.name = process.name()
 
     def __str__(self):
-        return f"{'{'}\n  Name : {self.name}\n  Path : {self.path}\n  {self.runtime}\n{'}'}\n\n"
+        return f"{self.name} : {self.time_running}"
+
+
+def get_running_processes():
+    processes = []
+    for proc in psutil.process_iter():
+        try:
+            print(proc.name())
+            processes.append(Process(proc))
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+    return processes
+
+
+def get_running_process_names():
+    processes = []
+    for proc in psutil.process_iter():
+        processes.append(proc.name())
+    return processes
+
+
+def get_pickled():
+    try:
+        with open("pickled.dat", "rb") as f:
+            processes = pickle.load(f)
+        return processes
+    except FileNotFoundError:
+        return None
 
 
 class Processes():
-    def update_process_list(self):
-        self.processes = []
-        for process in psutil.process_iter():
-            self.processes.append(Process(process))
-
-    def save_status(self):
-        with open("pickled.dat", "wb+") as file:
-            pickle.dump(self.processes, file)
-        with open("INFO.txt", "w+") as file:
-            previous_path = ""
-            for process in self.processes:
-                for setting in self.settings:
-                    if (process.path == setting or setting == "All") and previous_path != process.path:
-                        file.write(f"{process.name} = {process.runtime}\n")
-                        previous_path = process.path
-
-        self.update_process_list()
-
-    def load_status(self):
-        try:
-            with open("pickled.dat", "rb+") as file:
-                self.processes = pickle.load(file)
-        except:
-            self.update_process_list()
-
-    def __init__(self, settings=[]):
-        self.update_process_list()
-        self.settings = settings
-
-    def remove_redundant_names(self):
-        old_name = ""
-        new_processes = []
-        for process in self.processes:
-            if process.name == old_name:
-                continue
-            new_processes.append(process)
-            old_name = process.name
-        self.processes = new_processes
-
-    def remove_redundant_paths(self):
-        old_path = ""
-        new_processes = []
-        for process in self.processes:
-            if process.path == old_path:
-                continue
-            new_processes.append(process)
-            old_path = process.path
-        self.processes = new_processes
-
-
-class Settings():
     def __init__(self):
-        with open("settings.txt") as data:
-            file_data = data.read()
-        self.settings = file_data.split("\n")
+        self.processes = get_pickled()
+        if self.processes == None:
+            self.processes = get_running_processes()
+
+    def save_processes(self):
+        with open('processes.txt', 'w+') as f:
+            f.write("")
+        with open('processes.txt', 'a+') as f:
+            for process in self.processes:
+                f.write(str(process) + "\n")
+
+        # serialize processes
+        with open("pickled.dat", "wb+") as f:
+            pickle.dump(self.processes, f)
+
+    def add_to_running_processes(self, amount_of_time):
+        self.already_running_processes = get_running_processes()
+        self.already_added = []
+        for process in self.already_running_processes:
+            if (process not in self.processes):
+                self.processes.append(
+                    Process(process.process, time_running=amount_of_time))
+            if (process.name in self.already_running_processes and
+                    process.name not in self.already_added):
+                process.time_running += amount_of_time
 
 
 def main_loop():
-    settings = Settings()
-    processes = Processes(settings.settings)
-    processes.load_status()
-    while 1:
+    processes = Processes()
+    while True:
         start = time.time()
-        processes_to_change = []
-        current_processes = get_process_exes()
-        previous_name = ""
-        for i, process in enumerate(processes.processes):
-            time.sleep(.01)
-            if (
-                    process.path in current_processes
-                    and previous_name != process.name):
-                processes_to_change.append(i)
-                previous_name = process.name
-        for i in processes_to_change:
-            processes.processes[i].runtime += time.time() - start
-        processes.save_status()
+        processes.add_to_running_processes(time.time() - start)
+        processes.save_processes()
 
 
 if __name__ == '__main__':
