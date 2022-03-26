@@ -1,82 +1,65 @@
-import time
-from typing import Type
-import psutil
 import pickle
+from time import time
+import psutil
 
 
-class Process:
-    def __init__(self, process, time_running=0):
+def get_process_names():
+    return [proc.name() for proc in psutil.process_iter()]
+
+
+class Process():
+    def __init__(self, name, time_running=0):
         self.time_running = time_running
-        self.process = process
-        self.name = process.name()
+        self.name = name
 
-    def __str__(self):
-        return f"{self.name} : {self.time_running}"
-
-
-def get_running_processes():
-    processes = []
-    for proc in psutil.process_iter():
-        try:
-            print(proc.name())
-            processes.append(Process(proc))
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            continue
-    return processes
-
-
-def get_running_process_names():
-    processes = []
-    for proc in psutil.process_iter():
-        processes.append(proc.name())
-    return processes
-
-
-def get_pickled():
-    try:
-        with open("pickled.dat", "rb") as f:
-            processes = pickle.load(f)
-        return processes
-    except FileNotFoundError:
-        return None
+    def add_to_time(self, amount_of_time):
+        self.time_running += amount_of_time
 
 
 class Processes():
     def __init__(self):
-        self.processes = get_pickled()
-        if self.processes == None:
-            self.processes = get_running_processes()
+        self.processes = []
 
-    def save_processes(self):
-        with open('processes.txt', 'w+') as f:
-            f.write("")
-        with open('processes.txt', 'a+') as f:
-            for process in self.processes:
-                f.write(str(process) + "\n")
+    def load_processes(self, process_names):
+        for name in process_names:
+            self.processes.append(Process(name))
 
-        # serialize processes
-        with open("pickled.dat", "wb+") as f:
-            pickle.dump(self.processes, f)
+    # Save processes to file method
+    def save_processes_to_file(self):
+        pickle.dump(self.processes, open("pickled.dat", "wb+"))
 
-    def add_to_running_processes(self, amount_of_time):
-        self.already_running_processes = get_running_processes()
-        self.already_added = []
-        for process in self.already_running_processes:
-            if (process not in self.processes):
-                self.processes.append(
-                    Process(process.process, time_running=amount_of_time))
-            if (process.name in self.already_running_processes and
-                    process.name not in self.already_added):
-                process.time_running += amount_of_time
+    def load_processes_from_file(self):
+        try:
+            self.load_processes(pickle.load(open("pickled.dat", "rb")))
+        except:
+            self.save_processes_to_file()
+
+    def compare_processes(self, new_processes):
+        for process in self.processes:
+            if process.name not in new_processes:
+                new_processes.append(process)
+
+    def add_to_times(self, amount_of_time):
+        for process in self.processes:
+            if process.name in get_process_names():
+                process.add_to_time(amount_of_time)
+
+    def __str__(self):
+        process_string = ""
+        for process in self.processes:
+            process_string += process.name + ": " + \
+                str(process.time_running) + "\n"
+
+        return process_string
 
 
-def main_loop():
-    processes = Processes()
-    while True:
-        start = time.time()
-        processes.add_to_running_processes(time.time() - start)
-        processes.save_processes()
-
-
-if __name__ == '__main__':
-    main_loop()
+# Main loop that iterates through the processes and adds time to each process
+processes = Processes()
+start_time = time()
+while True:
+    processes.load_processes(get_process_names())
+    processes.compare_processes(get_process_names())
+    processes.add_to_times(time() - start_time)
+    print(processes)
+    processes.load_processes_from_file()
+    start_time = time()
